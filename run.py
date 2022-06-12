@@ -79,7 +79,7 @@ import random
 
 # create a random key
 seed = random.randint(0, 2**32 - 1)
-key = jax.random.PRNGKey(seed)
+keys = jax.random.PRNGKey(seed)
 
 ### text prompt
 
@@ -151,7 +151,7 @@ def home():
         for i in trange(max(n_predictions // jax.device_count(), 1)):
             print(f"Got 1 {i}\n")
             # get a new key
-            key, subkey = jax.random.split(key)
+            key, subkey = jax.random.split(keys)
             print(f"Got 2 {i}\n")
             # generate images
             encoded_images = p_generate(
