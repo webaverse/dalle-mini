@@ -257,7 +257,6 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=80,
-        mode="external",
         debug=False,
         # dev_tools_silence_routes_logging = False,
         # dev_tools_ui=True,
