@@ -102,7 +102,7 @@ app = Flask(__name__)
 def mkResponse(data):
   return make_response(send_file(
     data,
-    attachment_filename="image.png",
+    download_name="image.png",
     mimetype="image/png",
   ))
 
@@ -188,6 +188,7 @@ def home():
         # with open(f"out-{i}.png", "wb") as outfile:
         #     # Copy the BytesIO stream to the output file
         #     outfile.write(img_byte_arr.getbuffer())
+        print(f"sending {img_byte_arr} bytes...")
         response = mkResponse(img_byte_arr)
         
         print(f"Got A {i}\n")
