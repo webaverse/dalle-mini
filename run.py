@@ -95,14 +95,16 @@ from PIL import Image
 from tqdm.notebook import trange
 import io
 from flask import Flask, request, send_file, make_response, abort
-from werkzeug import FileWrapper
 # from random import randrange
 
 app = Flask(__name__)
 
 def mkResponse(data):
-  w = FileWrapper(data)
-  return Response(w, mimetype="image/png", direct_passthrough=True)
+  return send_file(
+    data,
+    download_name="image.png",
+    mimetype="image/png",
+  )
 
 @app.route("/image")
 def home():
@@ -183,6 +185,7 @@ def home():
         img = images[0]
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
         # with open(f"out-{i}.png", "wb") as outfile:
         #     # Copy the BytesIO stream to the output file
         #     outfile.write(img_byte_arr.getbuffer())
