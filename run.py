@@ -87,137 +87,177 @@ from dalle_mini import DalleBartProcessor
 
 processor = DalleBartProcessor.from_pretrained(DALLE_MODEL, revision=DALLE_COMMIT_ID)
 
-#
+# server
 
-print("text 1")
-prompts = ["witches and wizards anime screenshot"]
-
-#
-
-print("text 2")
-tokenized_prompts = processor(prompts)
-
-#
-
-print("text 3")
-tokenized_prompt = replicate(tokenized_prompts)
-
-### generate images
-
-print("generate 1")
-# number of predictions per prompt
-n_predictions = 32
-
-# We can customize generation parameters (see https://huggingface.co/blog/how-to-generate)
-gen_top_k = None
-gen_top_p = None
-temperature = None
-cond_scale = 10.0
-
-#
-
-print("generate 2")
 from flax.training.common_utils import shard_prng_key
 import numpy as np
 from PIL import Image
 from tqdm.notebook import trange
-
 import io
-from random import randrange
+from flask import request, send_file, make_response, abort
+# from random import randrange
 
-print(f"Prompts: {prompts}\n")
-# generate images
-images = []
-for i in trange(max(n_predictions // jax.device_count(), 1)):
-    print(f"Got 1 {i}\n")
-    # get a new key
-    key, subkey = jax.random.split(key)
-    print(f"Got 2 {i}\n")
-    # generate images
-    encoded_images = p_generate(
-        tokenized_prompt,
-        shard_prng_key(subkey),
-        params,
-        gen_top_k,
-        gen_top_p,
-        temperature,
-        cond_scale,
-    )
-    print(f"Got 3 {i}\n")
-    # remove BOS
-    encoded_images = encoded_images.sequences[..., 1:]
-    print(f"Got 4 {i}\n")
-    # decode images
-    decoded_images = p_decode(encoded_images, vqgan_params)
-    decoded_images = decoded_images.clip(0.0, 1.0).reshape((-1, 256, 256, 3))
-    print(f"Got 5 {i} {len(decoded_images)}\n")
-    for j in range(len(decoded_images)):
-        print(f"Got 6 {i} {j}\n")
-        decoded_img = decoded_images[j]
-        print(f"Got 7 {i}\n")
-        img = Image.fromarray(np.asarray(decoded_img * 255, dtype=np.uint8))
-        images.append(img)
+def mkResponse(data):
+  return make_response(send_file(
+    data,
+    attachment_filename="image.png",
+    mimetype="image/png",
+  ))
 
-        print(f"Got 8 {i}\n")
+@app.server.route("/image")
+def home():
+    s = request.args.get("s")
+    response = None
+    if s is None or s == "":
+        response = make_response("no text provided", 400)
+    else:
+        # prompts = ["witches and wizards anime screenshot"]
+        prompts = [s]
+
+        print("text 1")
+
+        #
+
+        print("text 2")
+        tokenized_prompts = processor(prompts)
+
+        #
+
+        print("text 3")
+        tokenized_prompt = replicate(tokenized_prompts)
+
+        ### generate images
+
+        print("generate 1")
+        # number of predictions per prompt
+        n_predictions = 1
+
+        # We can customize generation parameters (see https://huggingface.co/blog/how-to-generate)
+        gen_top_k = None
+        gen_top_p = None
+        temperature = None
+        cond_scale = 10.0
+
+        #
+
+        print("generate 2")
+
+
+        print(f"Prompts: {prompts}\n")
+        # generate images
+        images = []
+        for i in trange(max(n_predictions // jax.device_count(), 1)):
+            print(f"Got 1 {i}\n")
+            # get a new key
+            key, subkey = jax.random.split(key)
+            print(f"Got 2 {i}\n")
+            # generate images
+            encoded_images = p_generate(
+                tokenized_prompt,
+                shard_prng_key(subkey),
+                params,
+                gen_top_k,
+                gen_top_p,
+                temperature,
+                cond_scale,
+            )
+            print(f"Got 3 {i}\n")
+            # remove BOS
+            encoded_images = encoded_images.sequences[..., 1:]
+            print(f"Got 4 {i}\n")
+            # decode images
+            decoded_images = p_decode(encoded_images, vqgan_params)
+            decoded_images = decoded_images.clip(0.0, 1.0).reshape((-1, 256, 256, 3))
+            print(f"Got 5 {i} {len(decoded_images)}\n")
+            for j in range(len(decoded_images)):
+                print(f"Got 6 {i} {j}\n")
+                decoded_img = decoded_images[j]
+                print(f"Got 7 {i}\n")
+                img = Image.fromarray(np.asarray(decoded_img * 255, dtype=np.uint8))
+                images.append(img)
+
+                print(f"Got 8 {i}\n")
+                # display(img)
+                # print()
+        print(f"Got 9 {i}\n")
+        img = images[0]
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
-        with open(f"out-{i}.png", "wb") as outfile:
-          # Copy the BytesIO stream to the output file
-          outfile.write(img_byte_arr.getbuffer())
-
-        print(f"Got 9 {i}\n")
-        # display(img)
-        # print()
+        # with open(f"out-{i}.png", "wb") as outfile:
+        #     # Copy the BytesIO stream to the output file
+        #     outfile.write(img_byte_arr.getbuffer())
+        response = mkResponse(img_byte_arr)
+        
         print(f"Got A {i}\n")
 
-### rank images by CLIP score
 
-# CLIP model
-CLIP_REPO = "openai/clip-vit-base-patch32"
-CLIP_COMMIT_ID = None
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    return response
 
-# Load CLIP
-clip, clip_params = FlaxCLIPModel.from_pretrained(
-    CLIP_REPO, revision=CLIP_COMMIT_ID, dtype=jnp.float16, _do_init=False
-)
-clip_processor = CLIPProcessor.from_pretrained(CLIP_REPO, revision=CLIP_COMMIT_ID)
-clip_params = replicate(clip_params)
+def rank():
+    ### rank images by CLIP score
 
-# score images
-@partial(jax.pmap, axis_name="batch")
-def p_clip(inputs, params):
-    logits = clip(params=params, **inputs).logits_per_image
-    return logits
+    # CLIP model
+    CLIP_REPO = "openai/clip-vit-base-patch32"
+    CLIP_COMMIT_ID = None
 
-#
+    # Load CLIP
+    clip, clip_params = FlaxCLIPModel.from_pretrained(
+        CLIP_REPO, revision=CLIP_COMMIT_ID, dtype=jnp.float16, _do_init=False
+    )
+    clip_processor = CLIPProcessor.from_pretrained(CLIP_REPO, revision=CLIP_COMMIT_ID)
+    clip_params = replicate(clip_params)
 
-from flax.training.common_utils import shard
+    # score images
+    @partial(jax.pmap, axis_name="batch")
+    def p_clip(inputs, params):
+        logits = clip(params=params, **inputs).logits_per_image
+        return logits
 
-# get clip scores
-clip_inputs = clip_processor(
-    text=prompts * jax.device_count(),
-    images=images,
-    return_tensors="np",
-    padding="max_length",
-    max_length=77,
-    truncation=True,
-).data
-logits = p_clip(shard(clip_inputs), clip_params)
+    #
 
-# organize scores per prompt
-p = len(prompts)
-logits = np.asarray([logits[:, i::p, i] for i in range(p)]).squeeze()
-#logits = rearrange(logits, '1 b p -> p b')
+    from flax.training.common_utils import shard
 
-#
+    # get clip scores
+    clip_inputs = clip_processor(
+        text=prompts * jax.device_count(),
+        images=images,
+        return_tensors="np",
+        padding="max_length",
+        max_length=77,
+        truncation=True,
+    ).data
+    logits = p_clip(shard(clip_inputs), clip_params)
 
-logits.shape
+    # organize scores per prompt
+    p = len(prompts)
+    logits = np.asarray([logits[:, i::p, i] for i in range(p)]).squeeze()
+    #logits = rearrange(logits, '1 b p -> p b')
 
-#
+    #
 
-for i, prompt in enumerate(prompts):
-    print(f"Prompt: {prompt}\n")
-    for idx in logits[i].argsort()[::-1]:
-        # display(images[idx*p+i])
-        print(f"Score: {jnp.asarray(logits[i][idx], dtype=jnp.float32):.2f}\n")
-    print()
+    logits.shape
+
+    #
+
+    for i, prompt in enumerate(prompts):
+        print(f"Prompt: {prompt}\n")
+        for idx in logits[i].argsort()[::-1]:
+            # display(images[idx*p+i])
+            print(f"Score: {jnp.asarray(logits[i][idx], dtype=jnp.float32):.2f}\n")
+        print()
+
+
+if __name__ == "__main__":
+    app.run_server(
+        host="0.0.0.0",
+        port=80,
+        mode="external",
+        debug=False,
+        # dev_tools_silence_routes_logging = False,
+        # dev_tools_ui=True,
+        # dev_tools_hot_reload=True,
+        threaded=True,
+    )
