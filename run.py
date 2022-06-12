@@ -100,11 +100,11 @@ from flask import Flask, request, send_file, make_response, abort
 app = Flask(__name__)
 
 def mkResponse(data):
-  return make_response(send_file(
+  return send_file(
     data,
     download_name="image.png",
     mimetype="image/png",
-  ))
+  )
 
 @app.route("/image")
 def home():
