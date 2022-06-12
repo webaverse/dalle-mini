@@ -106,7 +106,7 @@ def mkResponse(data):
     mimetype="image/png",
   ))
 
-@app.server.route("/image")
+@app.route("/image")
 def home():
     s = request.args.get("s")
     response = None
