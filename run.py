@@ -188,7 +188,7 @@ def home():
         # with open(f"out-{i}.png", "wb") as outfile:
         #     # Copy the BytesIO stream to the output file
         #     outfile.write(img_byte_arr.getbuffer())
-        print(f"sending {len(img_byte_arr)} bytes...")
+        print(f"sending {img_byte_arr.getbuffer().nbytes} bytes...")
         response = mkResponse(img_byte_arr)
         
         print(f"Got A {i}\n")
