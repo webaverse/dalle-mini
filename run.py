@@ -95,16 +95,14 @@ from PIL import Image
 from tqdm.notebook import trange
 import io
 from flask import Flask, request, send_file, make_response, abort
+from werkzeug import FileWrapper
 # from random import randrange
 
 app = Flask(__name__)
 
 def mkResponse(data):
-  return send_file(
-    data,
-    download_name="image.png",
-    mimetype="image/png",
-  )
+  w = FileWrapper(data)
+  return Response(w, mimetype="image/png", direct_passthrough=True)
 
 @app.route("/image")
 def home():
