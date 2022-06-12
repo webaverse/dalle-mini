@@ -94,8 +94,10 @@ import numpy as np
 from PIL import Image
 from tqdm.notebook import trange
 import io
-from flask import request, send_file, make_response, abort
+from flask import Flask, request, send_file, make_response, abort
 # from random import randrange
+
+app = Flask(__name__)
 
 def mkResponse(data):
   return make_response(send_file(
